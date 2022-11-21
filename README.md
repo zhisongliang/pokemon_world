@@ -118,7 +118,7 @@ compile the code, run the generated Makefile.
 The `-j` argument speeds up the compilation by multithreading the compiler.
 This will generate an executable, which you can run by typing
 
-	> ./lab3
+	> ./final
 
 !Note this assume a resources directory
 
@@ -139,9 +139,9 @@ OSX Xcode
 
 	> cmake -G Xcode ..
 
-This will generate `lab3.xcodeproj` project that you can open with Xcode.
+This will generate `final.xcodeproj` project that you can open with Xcode.
 
-- To run, change the target to `lab3` by going to Product -> Scheme -> lab3.
+- To run, change the target to `final` by going to Product -> Scheme -> lab3.
   Then click on the play button or press Command+R to run the application.
 - Edit the scheme to add command-line arguments (`../../resources`) or to run
   in release mode.
@@ -151,14 +151,14 @@ Windows Visual Studio 2015
 
 	> cmake -G "Visual Studio 14 2015" ..
 
-This will generate `lab3.sln` file that you can open with Visual Studio.
+This will generate `final.sln` file that you can open with Visual Studio.
 Other versions of Visual Studio are listed on the CMake page
 (<https://cmake.org/cmake/help/latest/manual/cmake-generators.7.html>).
 
-- To build and run the project, right-click on `lab3` in the project explorer
+- To build and run the project, right-click on `final` in the project explorer
   and then click on "Set as Startup Project." Then press F7 (Build Solution)
   and then F5 (Start Debugging).
-- To add a commandline argument (`../resources`), right-click on `lab3` in
+- To add a commandline argument (`../resources`), right-click on `final` in
   the project explorer and then click on "Properties" and then click to
   "Debugging."
 # pokemon_world
