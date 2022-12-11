@@ -8,8 +8,7 @@
 
 using namespace std;
 
-
-void Shape::loadMesh(const string &meshName, string *mtlpath, unsigned char *(loadimage)(char const *, int *, int *, int *, int))
+void Shape::loadMesh(const string &meshName, const string *mtlpath, unsigned char *(loadimage)(char const *, int *, int *, int *, int))
 {
 	// Load geometry
 	// Some obj files contain material information.
@@ -22,7 +21,6 @@ void Shape::loadMesh(const string &meshName, string *mtlpath, unsigned char *(lo
 		rc = tinyobj::LoadObj(shapes, objMaterials, errStr, meshName.c_str(), mtlpath->c_str());
 	else
 		rc = tinyobj::LoadObj(shapes, objMaterials, errStr, meshName.c_str());
-
 
 	if (!rc)
 	{
@@ -47,23 +45,22 @@ void Shape::loadMesh(const string &meshName, string *mtlpath, unsigned char *(lo
 
 		for (int i = 0; i < obj_count; i++)
 		{
-			//load textures
+			// load textures
 			textureIDs[i] = 0;
-			//texture sky			
+			// texture sky
 			posBuf[i] = shapes[i].mesh.positions;
 			norBuf[i] = shapes[i].mesh.normals;
 			texBuf[i] = shapes[i].mesh.texcoords;
 			eleBuf[i] = shapes[i].mesh.indices;
-			if (shapes[i].mesh.material_ids.size()>0)
+			if (shapes[i].mesh.material_ids.size() > 0)
 				materialIDs[i] = shapes[i].mesh.material_ids[0];
 			else
 				materialIDs[i] = -1;
-
 		}
 	}
-	//material:
+	// material:
 	for (int i = 0; i < objMaterials.size(); i++)
-		if (objMaterials[i].diffuse_texname.size()>0)
+		if (objMaterials[i].diffuse_texname.size() > 0)
 		{
 			char filepath[1000];
 			int width, height, channels;
@@ -73,9 +70,9 @@ void Shape::loadMesh(const string &meshName, string *mtlpath, unsigned char *(lo
 				filename = filename.substr(subdir + 1);
 			string str = *mtlpath + filename;
 			strcpy(filepath, str.c_str());
-			//stbi_load(char const *filename, int *x, int *y, int *comp, int req_comp)
+			// stbi_load(char const *filename, int *x, int *y, int *comp, int req_comp)
 
-			unsigned char* data = loadimage(filepath, &width, &height, &channels, 4);
+			unsigned char *data = loadimage(filepath, &width, &height, &channels, 4);
 			glGenTextures(1, &textureIDs[i]);
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_2D, textureIDs[i]);
@@ -85,7 +82,7 @@ void Shape::loadMesh(const string &meshName, string *mtlpath, unsigned char *(lo
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
 			glGenerateMipmap(GL_TEXTURE_2D);
-			//delete[] data;
+			// delete[] data;
 		}
 
 	int z;
@@ -107,14 +104,20 @@ void Shape::resize()
 	for (int i = 0; i < obj_count; i++)
 		for (size_t v = 0; v < posBuf[i].size() / 3; v++)
 		{
-			if (posBuf[i][3 * v + 0] < minX) minX = posBuf[i][3 * v + 0];
-			if (posBuf[i][3 * v + 0] > maxX) maxX = posBuf[i][3 * v + 0];
+			if (posBuf[i][3 * v + 0] < minX)
+				minX = posBuf[i][3 * v + 0];
+			if (posBuf[i][3 * v + 0] > maxX)
+				maxX = posBuf[i][3 * v + 0];
 
-			if (posBuf[i][3 * v + 1] < minY) minY = posBuf[i][3 * v + 1];
-			if (posBuf[i][3 * v + 1] > maxY) maxY = posBuf[i][3 * v + 1];
+			if (posBuf[i][3 * v + 1] < minY)
+				minY = posBuf[i][3 * v + 1];
+			if (posBuf[i][3 * v + 1] > maxY)
+				maxY = posBuf[i][3 * v + 1];
 
-			if (posBuf[i][3 * v + 2] < minZ) minZ = posBuf[i][3 * v + 2];
-			if (posBuf[i][3 * v + 2] > maxZ) maxZ = posBuf[i][3 * v + 2];
+			if (posBuf[i][3 * v + 2] < minZ)
+				minZ = posBuf[i][3 * v + 2];
+			if (posBuf[i][3 * v + 2] > maxZ)
+				maxZ = posBuf[i][3 * v + 2];
 		}
 
 	// From min and max compute necessary scale and shift for each dimension
@@ -163,7 +166,6 @@ void Shape::init()
 
 	{
 
-
 		// Initialize the vertex array object
 		glGenVertexArrays(1, &vaoID[i]);
 		glBindVertexArray(vaoID[i]);
@@ -209,7 +211,7 @@ void Shape::init()
 		assert(glGetError() == GL_NO_ERROR);
 	}
 }
-void Shape::draw(const shared_ptr<Program> prog,bool use_extern_texures) const
+void Shape::draw(const shared_ptr<Program> prog, bool use_extern_texures) const
 {
 	for (int i = 0; i < obj_count; i++)
 
@@ -248,8 +250,8 @@ void Shape::draw(const shared_ptr<Program> prog,bool use_extern_texures) const
 		// Bind element buffer
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, eleBufID[i]);
 
-		//texture
-		
+		// texture
+
 		if (!use_extern_texures)
 		{
 			int textureindex = materialIDs[i];

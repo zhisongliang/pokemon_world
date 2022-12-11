@@ -1,5 +1,7 @@
 Pokemon World - developed by OpenGL
 ========================================
+demo: 
+![](https://github.com/zhisongliang/pokemon_world/pokemonworld.png)
 
 Ubuntu Linux
 ------------

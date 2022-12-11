@@ -26,6 +26,4 @@ spec = clamp(spec,0,1);
 spec = pow(spec,20);
 color.rgb += vec3(1,1,1)*spec*3;
 color.a=1;
-
-
 }

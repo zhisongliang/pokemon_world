@@ -14,7 +14,8 @@ void main()
 vec2 texcoords=vertex_tex;
 float t=1./100.;
 texcoords -= vec2(camoff.x,camoff.z)*t;
-vec3 heightcolor = texture(tex, texcoords/10).rgb;
+
+vec3 heightcolor = texture(tex, texcoords).rgb;
 heightcolor.r = 0.1 + heightcolor.r*0.9;
 color.rgb = texture(tex2, texcoords*50).rgb * heightcolor.r;
 color.a=1;

@@ -1,7 +1,6 @@
 /*
-base code Wood/Dunn/Eckhardt
-modified by:  <Zhisong Liang>
-Pokemon World
+CPE/CSC 471 Lab base code Wood/Dunn/Eckhardt
+Modified by: <Zhisong Liang>
 */
 
 #include <iostream>
@@ -11,6 +10,7 @@ Pokemon World
 #include "GLSL.h"
 #include "Program.h"
 #include "MatrixStack.h"
+#include "Pokemon.cpp"
 
 #include "WindowManager.h"
 #include "Shape.h"
@@ -20,12 +20,16 @@ Pokemon World
 using namespace std;
 using namespace glm;
 shared_ptr<Shape> shape;
-shared_ptr<Shape> chaomeng;
-shared_ptr<Shape> eeve;
-shared_ptr<Shape> pichu;
+shared_ptr<Shape> umbreon;
+shared_ptr<Shape> charizard;
 
-#define NUM_BILLBOARDS 20
-#define SPEED 10
+#define SPEED 4
+#define NUM_POKEMON 100
+#define GRAVITY 9.8
+#define pokeballLimit 10
+vec3 mypos;
+Pokemon umbreons[NUM_POKEMON];
+Pokemon charizards[NUM_POKEMON / 5];
 
 double get_last_elapsed_time()
 {
@@ -40,7 +44,8 @@ class camera
 public:
 	glm::vec3 pos, rot;
 	glm::mat4 inverseR;
-	int w, a, s, d, q, e;
+	int w, a, s, d, q, e, z, x, c, v, b, n, m, space, shift;
+	int gravityFlag = 0;
 	camera()
 	{
 		w = a = s = d = 0;
@@ -50,6 +55,24 @@ public:
 	{
 		float speed = 0;
 		float speed2 = 0;
+
+		if (z == 1)
+		{
+			gravityFlag = 1;
+		}
+		else if (z == 0)
+		{
+			gravityFlag = 0;
+		}
+
+		if (gravityFlag == 1)
+		{
+			if (mypos.y > -4.4)
+			{
+				speed2 = SPEED * ftime;
+			}
+		}
+
 		if (w == 1)
 		{
 			speed = SPEED * ftime;
@@ -58,11 +81,16 @@ public:
 		{
 			speed = -SPEED * ftime;
 		}
-		if (q == 1)
+
+		if (e == 1)
 		{
-			speed2 = SPEED * ftime;
+			// collision detection
+			if (mypos.y > -4.4)
+			{
+				speed2 = 3 * SPEED * ftime;
+			}
 		}
-		else if (e == 1)
+		else if (q == 1 || space == 1)
 		{
 			speed2 = -SPEED * ftime;
 		}
@@ -76,6 +104,7 @@ public:
 		glm::vec4 dir = glm::vec4(0, speed2, speed, 1);
 		dir = dir * R;
 		pos += glm::vec3(dir.x, dir.y, dir.z);
+		mypos = -pos;
 		glm::mat4 T = glm::translate(glm::mat4(1), pos + glm::vec3(0, -5, 0));
 		inverseR = inverse(R);
 		return R * T;
@@ -91,21 +120,20 @@ public:
 	WindowManager *windowManager = nullptr;
 
 	// Our shader program
-	std::shared_ptr<Program> prog, prog2, heightshader;
+	std::shared_ptr<Program> prog, prog2, heightshader, pokemon, pokemon2;
 
 	// Contains vertex information for OpenGL
 	GLuint VertexArrayID, VertexArrayID2;
 
+	GLuint VertexBufferIDScreen, VertexNormalIDBox, VertexTexIDBox, VertexBufferTexScreen;
+	GLuint VertexBufferID2, VertexNormDBox2, VertexTexBox2, IndexBufferIDBox2, InstanceBuffer;
+
 	// Data necessary to give our box to OpenGL
-	GLuint MeshPosID, MeshTexID, IndexBufferIDBox, IndexBufferIDBox2;
-	GLuint VertexBufferID, VertexNormalIDBox, VertexTexIDBox;
+	GLuint MeshPosID, MeshTexID, IndexBufferIDBox;
 
 	// texture data
-	GLuint Texture;
-	GLuint Texture2, HeightTex;
-	GLuint Texture3;
-
-	vec4 billboards[NUM_BILLBOARDS]; // billboard positions
+	GLuint Texture, grassTexture, HeightTex, PokeballTex, fireTex, Texture5;
+	GLuint grayTex;
 
 	void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
 	{
@@ -161,6 +189,30 @@ public:
 		if (key == GLFW_KEY_E && action == GLFW_RELEASE)
 		{
 			mycam.e = 0;
+		}
+		if (key == GLFW_KEY_Z && action == GLFW_PRESS)
+		{
+			mycam.z = 1;
+		}
+		if (key == GLFW_KEY_X && action == GLFW_RELEASE)
+		{
+			mycam.z = 0;
+		}
+		if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
+		{
+			mycam.space = 1;
+		}
+		if (key == GLFW_KEY_SPACE && action == GLFW_RELEASE)
+		{
+			mycam.space = 0;
+		}
+		if (key == GLFW_KEY_C && action == GLFW_PRESS)
+		{
+			mycam.c = 1;
+		}
+		if (key == GLFW_KEY_C && action == GLFW_RELEASE)
+		{
+			mycam.c = 0;
 		}
 	}
 
@@ -259,12 +311,22 @@ public:
 		// initialize the net mesh
 		init_mesh();
 
-		for (int i = 0; i < NUM_BILLBOARDS; i++)
+		for (int i = 0; i < NUM_POKEMON; i++)
 		{
-			billboards[i] = vec4(((float)rand() / (float)RAND_MAX) * 5,
-								 ((float)rand() / (float)RAND_MAX) * 2,
-								 0,
-								 0);
+			umbreons[i] = Pokemon(0, i);
+			// // initialize the unmbreon
+			// unmbreonPos[i].x = -rand() / (float)RAND_MAX * 100;
+			// unmbreonPos[i].y = 0;
+			// unmbreonPos[i].z = -rand() / (float)RAND_MAX * 100;
+		}
+
+		for (int i = 0; i < NUM_POKEMON / 5; i++)
+		{
+			charizards[i] = Pokemon(1, i);
+			// initialize the pokemon
+			// charizaPos[i].x = -rand() / (float)RAND_MAX * 100;
+			// charizaPos[i].y = rand() / (float)RAND_MAX * 50 + 20;
+			// charizaPos[i].z = -rand() / (float)RAND_MAX * 100;
 		}
 
 		// generate the VAO
@@ -272,54 +334,81 @@ public:
 		glBindVertexArray(VertexArrayID2);
 
 		// generate vertex buffer to hand off to OGL
-		glGenBuffers(1, &VertexBufferID);
-		glBindBuffer(GL_ARRAY_BUFFER, VertexBufferID);
+		glGenBuffers(1, &VertexBufferID2);
+		// set the current state to focus on our vertex buffer
+		glBindBuffer(GL_ARRAY_BUFFER, VertexBufferID2);
 
-		GLfloat rect_vertices[] = {
-			-0.5f, -0.5f, 0.5f,
-			0.5f, -0.5f, 0.5f,
-			0.5f, 0.5f, 0.5f,
-			-0.5f, 0.5f, 0.5f};
-
+		GLfloat cube_vertices[] = {
+			// front
+			-1.0, -1.0, 1.0, // LD
+			1.0, -1.0, 1.0,	 // RD
+			1.0, 1.0, 1.0,	 // RU
+			-1.0, 1.0, 1.0,	 // LU
+		};
+		// make it a bit smaller
+		for (int i = 0; i < 12; i++)
+			cube_vertices[i] *= 0.5;
 		// actually memcopy the data - only do this once
-		glBufferData(GL_ARRAY_BUFFER, sizeof(rect_vertices), rect_vertices, GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(cube_vertices), cube_vertices, GL_DYNAMIC_DRAW);
 
 		// we need to set up the vertex array
 		glEnableVertexAttribArray(0);
-
 		// key function to get up how many elements to pull out at a time (3)
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *)0);
 
+		// color
 		GLfloat cube_norm[] = {
-			0.0f, 0.0f, 1.0f,
-			0.0f, 0.0f, 1.0f,
-			0.0f, 0.0f, 1.0f,
-			0.0f, 0.0f, 1.0f};
+			// front colors
+			0.0,
+			0.0,
+			1.0,
+			0.0,
+			0.0,
+			1.0,
+			0.0,
+			0.0,
+			1.0,
+			0.0,
+			0.0,
+			1.0,
 
-		glGenBuffers(1, &VertexNormalIDBox);
+		};
+		glGenBuffers(1, &VertexNormDBox2);
 		// set the current state to focus on our vertex buffer
-		glBindBuffer(GL_ARRAY_BUFFER, VertexNormalIDBox);
+		glBindBuffer(GL_ARRAY_BUFFER, VertexNormDBox2);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(cube_norm), cube_norm, GL_STATIC_DRAW);
 		glEnableVertexAttribArray(1);
 		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (void *)0);
 
-		// color data
-		vec2 cube_tex[] = {
-			vec2(0.0, 2.0),
-			vec2(2.0, 2.0),
-			vec2(2.0, 0.0),
-			vec2(0.0, 0.0)};
+		// color
+		glm::vec2 cube_tex[] = {
+			// front colors
+			glm::vec2(0.0, 1.0),
+			glm::vec2(1.0, 1.0),
+			glm::vec2(1.0, 0.0),
+			glm::vec2(0.0, 0.0),
 
-		glGenBuffers(1, &VertexTexIDBox);
+		};
+		glGenBuffers(1, &VertexTexBox2);
 		// set the current state to focus on our vertex buffer
-		glBindBuffer(GL_ARRAY_BUFFER, VertexTexIDBox);
+		glBindBuffer(GL_ARRAY_BUFFER, VertexTexBox2);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(cube_tex), cube_tex, GL_STATIC_DRAW);
 		glEnableVertexAttribArray(2);
 		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, (void *)0);
 
 		glGenBuffers(1, &IndexBufferIDBox2);
+		// set the current state to focus on our vertex buffer
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IndexBufferIDBox2);
-		GLushort cube_elements[] = {0, 1, 2, 2, 3, 0};
+		GLushort cube_elements[] = {
+
+			// front
+			0,
+			1,
+			2,
+			2,
+			3,
+			0,
+		};
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cube_elements), cube_elements, GL_STATIC_DRAW);
 
 		glBindVertexArray(0);
@@ -327,31 +416,26 @@ public:
 		string resourceDirectory = "../../resources";
 		// Initialize mesh.
 		shape = make_shared<Shape>();
-		// shape->loadMesh(resourceDirectory + "/t800.obj");
 		shape->loadMesh(resourceDirectory + "/sphere.obj");
 		shape->resize();
 		shape->init();
 
-		chaomeng = make_shared<Shape>();
-		chaomeng->loadMesh(resourceDirectory + "/pokemon/chaomeng.obj");
-		chaomeng->resize();
-		chaomeng->init();
+		umbreon = make_shared<Shape>();
+		umbreon->loadMesh(resourceDirectory + "/pokemon/umbreon.obj");
+		umbreon->resize();
+		umbreon->init();
 
-		pichu = make_shared<Shape>();
-		pichu->loadMesh(resourceDirectory + "/pokemon/pichu.obj");
-		pichu->resize();
-		pichu->init();
-
-		eeve = make_shared<Shape>();
-		eeve->loadMesh(resourceDirectory + "/pokemon/eeve.obj");
-		eeve->resize();
-		eeve->init();
+		string str1 = resourceDirectory + "/pokemon";
+		charizard = make_shared<Shape>();
+		charizard->loadMesh(resourceDirectory + "/pokemon/charizard.obj", &str1);
+		charizard->resize();
+		charizard->init();
 
 		int width, height, channels;
 		char filepath[1000];
 
 		// texture 1
-		string str = resourceDirectory + "/grass.jpg";
+		string str = resourceDirectory + "/Texture/storm.jpg";
 		strcpy(filepath, str.c_str());
 		unsigned char *data = stbi_load(filepath, &width, &height, &channels, 4);
 		glGenTextures(1, &Texture);
@@ -362,14 +446,16 @@ public:
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+		// generate mipmap, this will automatically generate all the required mipmaps for the currently bound texture object.
 		glGenerateMipmap(GL_TEXTURE_2D);
+
 		// texture 2
-		str = resourceDirectory + "/sky.jpg";
+		str = resourceDirectory + "/Texture/grass.jpg";
 		strcpy(filepath, str.c_str());
 		data = stbi_load(filepath, &width, &height, &channels, 4);
-		glGenTextures(1, &Texture2);
+		glGenTextures(1, &grassTexture);
 		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, Texture2);
+		glBindTexture(GL_TEXTURE_2D, grassTexture);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -378,7 +464,7 @@ public:
 		glGenerateMipmap(GL_TEXTURE_2D);
 
 		// texture 3
-		str = resourceDirectory + "/grand_canyon2.heightmap.jpg";
+		str = resourceDirectory + "/height.png";
 		strcpy(filepath, str.c_str());
 		data = stbi_load(filepath, &width, &height, &channels, 4);
 		glGenTextures(1, &HeightTex);
@@ -392,12 +478,54 @@ public:
 		glGenerateMipmap(GL_TEXTURE_2D);
 
 		// texture 4
-		str = resourceDirectory + "/clouds.jpg";
+		str = resourceDirectory + "/Texture/pokeball.jpg";
 		strcpy(filepath, str.c_str());
 		data = stbi_load(filepath, &width, &height, &channels, 4);
-		glGenTextures(1, &Texture3);
+		glGenTextures(1, &PokeballTex);
 		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, Texture3);
+		glBindTexture(GL_TEXTURE_2D, PokeballTex);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+		glGenerateMipmap(GL_TEXTURE_2D);
+
+		// texture 5
+		str = resourceDirectory + "/Texture/fire2.jpeg";
+		strcpy(filepath, str.c_str());
+		data = stbi_load(filepath, &width, &height, &channels, 4);
+		glGenTextures(1, &fireTex);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, fireTex);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+		glGenerateMipmap(GL_TEXTURE_2D);
+
+		// texture 6
+		str = resourceDirectory + "/Texture/thunder.jpg";
+		strcpy(filepath, str.c_str());
+		data = stbi_load(filepath, &width, &height, &channels, 4);
+		glGenTextures(1, &Texture5);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, Texture5);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+		glGenerateMipmap(GL_TEXTURE_2D);
+
+		// texture 7
+		str = resourceDirectory + "/Texture/clouds.jpg";
+		strcpy(filepath, str.c_str());
+		data = stbi_load(filepath, &width, &height, &channels, 4);
+		glGenTextures(1, &grayTex);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, grayTex);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -421,18 +549,19 @@ public:
 		glUniform1i(Tex1Location, 0);
 		glUniform1i(Tex2Location, 1);
 
-		Tex1Location = glGetUniformLocation(prog2->pid, "tex");
-		glUseProgram(prog2->pid);
-		// To Check
-		glUniform1i(Tex1Location, 3);
+		Tex1Location = glGetUniformLocation(pokemon->pid, "tex"); // tex, tex2... sampler in the fragment shader
+		Tex2Location = glGetUniformLocation(pokemon->pid, "tex2");
+		// Then bind the uniform samplers to texture units:
+		glUseProgram(pokemon->pid);
+		glUniform1i(Tex1Location, 0);
+		glUniform1i(Tex2Location, 1);
 
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	}
 
 	// General OGL initialization - set OGL state here
-	void
-	init(const std::string &resourceDirectory)
+	void init(const std::string &resourceDirectory)
 	{
 		GLSL::checkVersion();
 
@@ -458,6 +587,22 @@ public:
 		prog->addAttribute("vertNor");
 		prog->addAttribute("vertTex");
 
+		prog2 = std::make_shared<Program>();
+		prog2->setVerbose(true);
+		prog2->setShaderNames(resourceDirectory + "/shader_vertex2.glsl", resourceDirectory + "/shader_fragment2.glsl");
+		if (!prog2->init())
+		{
+			std::cerr << "One or more shaders failed to compile... exiting!" << std::endl;
+			exit(1);
+		}
+		prog2->addUniform("P");
+		prog2->addUniform("V");
+		prog2->addUniform("M");
+		prog2->addUniform("campos");
+		prog2->addAttribute("vertPos");
+		prog2->addAttribute("vertNor");
+		prog2->addAttribute("vertTex");
+
 		// Initialize the GLSL program.
 		heightshader = std::make_shared<Program>();
 		heightshader->setVerbose(true);
@@ -475,21 +620,39 @@ public:
 		heightshader->addAttribute("vertPos");
 		heightshader->addAttribute("vertTex");
 
-		prog2 = std::make_shared<Program>();
-		prog2->setVerbose(true);
-		prog2->setShaderNames(resourceDirectory + "/shader_vertex2.glsl", resourceDirectory + "/shader_fragment2.glsl");
-		if (!prog2->init())
+		pokemon = std::make_shared<Program>();
+		pokemon->setVerbose(true);
+		pokemon->setShaderNames(resourceDirectory + "/pokemon_vertex.glsl", resourceDirectory + "/pokemon_frag.glsl");
+		if (!pokemon->init())
 		{
 			std::cerr << "One or more shaders failed to compile... exiting!" << std::endl;
 			exit(1);
 		}
-		prog2->addUniform("P");
-		prog2->addUniform("V");
-		prog2->addUniform("M");
-		prog2->addUniform("campos");
-		prog2->addAttribute("vertPos");
-		prog2->addAttribute("vertNor");
-		prog2->addAttribute("vertTex");
+		pokemon->addUniform("P");
+		pokemon->addUniform("V");
+		pokemon->addUniform("M");
+		pokemon->addUniform("camoff");
+		pokemon->addUniform("campos");
+		pokemon->addAttribute("vertPos");
+		pokemon->addAttribute("vertTex");
+		pokemon->addAttribute("vertNor");
+
+		pokemon2 = std::make_shared<Program>();
+		pokemon2->setVerbose(true);
+		pokemon2->setShaderNames(resourceDirectory + "/psyduck_vertex.glsl", resourceDirectory + "/psyduck_frag.glsl");
+		if (!pokemon2->init())
+		{
+			std::cerr << "One or more shaders failed to compile... exiting!" << std::endl;
+			exit(1);
+		}
+		pokemon2->addUniform("P");
+		pokemon2->addUniform("V");
+		pokemon2->addUniform("M");
+		pokemon2->addUniform("camoff");
+		pokemon2->addUniform("campos");
+		pokemon2->addAttribute("vertPos");
+		pokemon2->addAttribute("vertTex");
+		pokemon2->addAttribute("vertNor");
 	}
 
 	/****DRAW
@@ -516,7 +679,6 @@ public:
 		glm::mat4 V, M, P; // View, Model and Perspective matrix
 		V = glm::mat4(1);
 		M = glm::mat4(1);
-
 		// Apply orthographic projection....
 		P = glm::ortho(-1 * aspect, 1 * aspect, -1.0f, 1.0f, -2.0f, 100.0f);
 		if (width < height)
@@ -535,63 +697,32 @@ public:
 		glm::mat4 RotateX = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(1.0f, 0.0f, 0.0f));
 		glm::mat4 TransZ = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -3 + trans));
 		glm::mat4 S = glm::scale(glm::mat4(1.0f), glm::vec3(0.8f, 0.8f, 0.8f));
-
 		S = glm::scale(glm::mat4(1.0f), glm::vec3(100.0f, 100.0f, 100.0f));
 		M = TransZ * RotateY * RotateX * S;
 
 		// Draw the box using GLSL.
+
 		prog->bind();
 
-		V = mycam.process(frametime);
-		// send the matrices to the shaders
+		V = mat4(1);
+		// storm effect
 		glUniformMatrix4fv(prog->getUniform("P"), 1, GL_FALSE, &P[0][0]);
 		glUniformMatrix4fv(prog->getUniform("V"), 1, GL_FALSE, &V[0][0]);
 		glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, &M[0][0]);
 		glUniform3fv(prog->getUniform("campos"), 1, &mycam.pos[0]);
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, Texture2);
+		glBindTexture(GL_TEXTURE_2D, Texture);
+
+		glDisable(GL_DEPTH_TEST);
 		shape->draw(prog, false);
-
-		static float y = 0.0;
-		static int flag = 0;
-		if (flag == 0)
-		{
-			y += 5.0 * frametime;
-			if (y > 10.0)
-			{
-				flag = 1;
-			}
-		}
-		else
-		{
-			y -= 5.0 * frametime;
-			if (y < -10.0)
-			{
-				flag = 0;
-			}
-		}
-
-		S = glm::scale(glm::mat4(1.0f), glm::vec3(0.8f, 0.8f, 0.8f));
-		mat4 Trans = translate(mat4(1.0f), vec3(10.0f, 15.0f + y, 0.0f));
-		M = TransZ * Trans * S;
-		glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, &M[0][0]);
-		chaomeng->draw(prog, false);
-
-		Trans = translate(mat4(1.0f), vec3(-10.0f, 5.0f + y, 0.0f));
-		M = TransZ * Trans * S;
-		glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, &M[0][0]);
-		pichu->draw(prog, false);
-
-		Trans = translate(mat4(1.0f), vec3(-20.0f, 5.0f + y, 30.0f));
-		M = TransZ * Trans * S;
-		glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, &M[0][0]);
-		eeve->draw(prog, false);
+		glEnable(GL_DEPTH_TEST);
 
 		prog->unbind();
 
 		heightshader->bind();
+		V = mycam.process(frametime);
 		// glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		glm::mat4 TransY = glm::translate(glm::mat4(1.0f), glm::vec3(-50.0f, -20.0f, -50));
+		glm::mat4 TransY = glm::translate(glm::mat4(1.0f), glm::vec3(-50.0f, 0.0f, -50));
 		M = TransY;
 		glUniformMatrix4fv(heightshader->getUniform("M"), 1, GL_FALSE, &M[0][0]);
 		glUniformMatrix4fv(heightshader->getUniform("P"), 1, GL_FALSE, &P[0][0]);
@@ -608,55 +739,176 @@ public:
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, HeightTex);
 		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, Texture);
+		glBindTexture(GL_TEXTURE_2D, grassTexture);
 		glDrawElements(GL_TRIANGLES, MESHSIZE * MESHSIZE * 6, GL_UNSIGNED_SHORT, (void *)0);
 
 		heightshader->unbind();
 
 		prog2->bind();
+		V = mat4(1);
 		glUniformMatrix4fv(prog2->getUniform("P"), 1, GL_FALSE, &P[0][0]);
 		glUniformMatrix4fv(prog2->getUniform("V"), 1, GL_FALSE, &V[0][0]);
-
-		glActiveTexture(GL_TEXTURE3);
-		glBindTexture(GL_TEXTURE_2D, Texture3);
+		glUniform3fv(prog2->getUniform("campos"), 1, &mycam.pos[0]);
 		glBindVertexArray(VertexArrayID2);
-		S = glm::scale(glm::mat4(1.0f), glm::vec3(5.f, 2.f, 0.f));
+		// actually draw from vertex 0, 3 vertices
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IndexBufferIDBox2);
+		mat4 Vi = glm::transpose(V);
+		Vi[0][3] = 0;
+		Vi[1][3] = 0;
+		Vi[2][3] = 0;
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, PokeballTex);
 
-		vec3 pos;
-		for (int i = 0; i < NUM_BILLBOARDS; i++)
+		S = glm::scale(glm::mat4(1.0f), glm::vec3(0.1f, 0.1f, 0.1f));
+		// calculate how many pokemon been caught
+		int count = 0;
+
+		for (int i = 0; i < NUM_POKEMON; i++)
 		{
-			pos = vec3(billboards[i].x, billboards[i].y, billboards[i].z);
-			float leng = glm::length(pos + mycam.pos);
-			billboards[i].w = leng;
+			if (umbreons[i].getCaught() == 1)
+			{
+				cout << umbreons[i].getID() << " umbreon get caught" << endl;
+				count++;
+			}
 		}
 
-		glDisable(GL_DEPTH_TEST);
-		int n = sizeof(billboards) / sizeof(billboards[0]);
-		std::sort(billboards, billboards + n, [](const vec4 &a, const vec4 &b)
-				  { return a.w > b.w; });
-
-		for (int i = 0; i < NUM_BILLBOARDS; i++)
+		for (int i = 0; i < NUM_POKEMON / 5; i++)
 		{
-			mat4 Trans = translate(mat4(1.0f), vec3(billboards[i].x, billboards[i].y + 5, billboards[i].z));
-			M = Trans * mycam.inverseR * S;
+			if (charizards[i].getCaught() == 1)
+			{
+				cout << charizards[i].getID() << " charizards get caught" << endl;
+				count++;
+			}
+		}
+
+		for (int i = 0; i < count; i++)
+		{
+			mat4 TranPokeball = glm::translate(glm::mat4(1.0f), glm::vec3(1.8f, 1.0f - i * 0.1f, 0.0f));
+			M = TransZ * TranPokeball * S * Vi;
 			glUniformMatrix4fv(prog2->getUniform("M"), 1, GL_FALSE, &M[0][0]);
 			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, (void *)0);
 		}
 
-		for (int i = 0; i < NUM_BILLBOARDS; i++)
+		prog2->unbind();
+
+		pokemon->bind();
+		/*main character*/
+		static float y = 0.0;
+		static int flag = 0;
+		if (flag == 0)
 		{
-			billboards[i].x += 0.05;
-			billboards[i].z -= 0.05;
-			if (billboards[i].x > 20)
-				billboards[i].x = mycam.pos.x;
+			y += 0.001;
+			if (y > 0.05)
+			{
+				flag = 1;
+			}
+		}
+		else
+		{
+			y -= 0.001;
+			if (y < -0.05)
+			{
+				flag = 0;
+			}
+		}
+		V = mat4(1);
+		S = glm::scale(glm::mat4(1.0f), glm::vec3(0.4f, 0.4f, 0.4f));
+		mat4 T = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
+
+		if (mycam.gravityFlag == 0)
+			T = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.25f + y, 2.0f));
+		else
+			T = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.25f, 2.0f));
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, Texture5);
+		glUniformMatrix4fv(pokemon->getUniform("P"), 1, GL_FALSE, &P[0][0]);
+		glUniformMatrix4fv(pokemon->getUniform("V"), 1, GL_FALSE, &V[0][0]);
+		glUniform3fv(heightshader->getUniform("camoff"), 1, &offset[0]);
+		glUniform3fv(heightshader->getUniform("campos"), 1, &mycam.pos[0]);
+		// rotate x 180 degree
+		mat4 R = glm::rotate(glm::mat4(1.0f), 3.14f, glm::vec3(0.0f, 1.0f, 0.0f));
+		M = TransZ * T * R * S;
+		glUniformMatrix4fv(pokemon->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+		charizard->draw(pokemon, false);
+		pokemon->unbind();
+		/***main character***/
+
+		pokemon2->bind();
+		glUniformMatrix4fv(pokemon2->getUniform("P"), 1, GL_FALSE, &P[0][0]);
+		V = mycam.process(frametime);
+		glUniformMatrix4fv(pokemon2->getUniform("V"), 1, GL_FALSE, &V[0][0]);
+		// rotate Y 90 degree
+		RotateY = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(-1.0f, 0.0f, 0.0f));
+
+		S = glm::scale(glm::mat4(1.0f), glm::vec3(0.2f, 0.2f, 0.2f));
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, grayTex);
+		// umbreon
+		for (int i = 0; i < NUM_POKEMON; i++)
+		{
+			// distance between pokemon and camera
+			float distance = sqrt(pow(mypos.x - umbreons[i].getPos().x, 2) + pow(mypos.z - umbreons[i].getPos().z, 2));
+			// if flag been caught, then don't draw, if too far, don't draw
+			if (umbreons[i].getCaught() == 1)
+			{
+				continue;
+			}
+
+			umbreons[i].update(i);
+
+			if (distance > 50)
+			{
+				continue;
+			}
+			// if mewtwo position is close to umbreon, then flag it to be caught
+			if (mycam.c == 1 && abs(mypos.x - umbreons[i].getPos().x) < 2 && abs(mypos.z - umbreons[i].getPos().z) < 2 && abs(mypos.y - umbreons[i].getPos().y + 4.5) < 2)
+			{
+				umbreons[i].setCaught(1);
+			}
+			T = glm::translate(glm::mat4(1.0f), glm::vec3(umbreons[i].getPos().x, umbreons[i].getPos().y + 0.2f, umbreons[i].getPos().z));
+			M = T * S;
+			glUniformMatrix4fv(pokemon2->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, (void *)0);
+			umbreon->draw(pokemon2, false);
 		}
 
-		prog2->unbind();
+		S = glm::scale(glm::mat4(1.0f), glm::vec3(10.0f, 10.0f, 10.0f));
+		// charizard
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, fireTex);
+		for (int i = 0; i < NUM_POKEMON / 5; i++)
+		{
+			float distance = sqrt(pow(mypos.x - charizards[i].getPos().x, 2) + pow(mypos.z - charizards[i].getPos().z, 2));
+			if (charizards[i].getCaught() == 1)
+			{
+				continue;
+			}
+			charizards[i].update(i);
+			// if my position is close to charizard, then flag it to be caught
+			if (mycam.c == 1 && abs(mypos.x - charizards[i].getPos().x) < 15 && abs(mypos.z - charizards[i].getPos().z) < 15 && abs(mypos.y - charizards[i].getPos().y + 4.5) < 10)
+			{
+				charizards[i].setCaught(1);
+			}
+			if (distance > 100)
+			{
+				continue;
+			}
+			T = glm::translate(glm::mat4(1.0f), glm::vec3(charizards[i].getPos().x, charizards[i].getPos().y, charizards[i].getPos().z));
+			M = T * S;
+			glUniformMatrix4fv(pokemon2->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, (void *)0);
+			charizard->draw(pokemon2, false);
+		}
+
+		pokemon2->unbind();
 	}
 };
 //******************************************************************************************
 int main(int argc, char **argv)
 {
+	srand(time(NULL));
 	std::string resourceDir = "../../resources"; // Where the resources are loaded from
 	if (argc >= 2)
 	{
